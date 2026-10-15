@@ -1,4 +1,4 @@
-import { MCP_SERVERS } from '@novu/shared';
+import { MCP_SERVERS, McpConnectionAuthModeEnum } from '@novu/shared';
 import { FilterQuery } from 'mongoose';
 
 import type { EnforceEnvOrOrgIds } from '../../types';
@@ -63,7 +63,11 @@ export class AgentMcpServerRepository extends BaseRepositoryV2<
       enabledOnly: true,
     });
 
-    return enablements.filter((row) => MCP_SERVERS.some((entry) => entry.id === row.mcpId && entry.oauth));
+    return enablements.filter((row) =>
+      MCP_SERVERS.some(
+        (entry) => entry.id === row.mcpId && entry.oauth && entry.oauth.mode !== McpConnectionAuthModeEnum.None
+      )
+    );
   }
 
   async findByAgentAndMcpId({

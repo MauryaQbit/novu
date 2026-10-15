@@ -33,7 +33,7 @@ export type McpConnectionScope = 'environment' | 'agent' | 'subscriber';
  *                        `oauthClient` are intentionally absent because Novu
  *                        never speaks OAuth for these MCPs.
  */
-export type McpConnectionAuthMode = 'dcr' | 'novu-app' | 'user-app' | 'provider-managed';
+export type McpConnectionAuthMode = 'dcr' | 'novu-app' | 'user-app' | 'provider-managed' | 'none';
 
 export type McpConnectionStatus = 'pending_oauth' | 'connected' | 'expired' | 'revoked' | 'error';
 

@@ -89,11 +89,23 @@ export type ProviderManagedOAuthCatalogEntry = {
   mode: McpConnectionAuthModeEnum.ProviderManaged;
 };
 
+/**
+ * Keyless entry. The MCP server accepts anonymous connections (no OAuth,
+ * no API key), so Novu never builds an authorize URL and never persists
+ * connection rows for it — enablement alone puts the server on the managed
+ * runtime. The `none` mode must never be confused with an OAuth mode: the
+ * picker renders it without any auth CTA and the OAuth endpoints reject it.
+ */
+export type NoAuthCatalogEntry = {
+  mode: McpConnectionAuthModeEnum.None;
+};
+
 export type McpOAuthCatalogEntry =
   | DcrOAuthCatalogEntry
   | NovuAppOAuthCatalogEntry
   | UserAppOAuthCatalogEntry
-  | ProviderManagedOAuthCatalogEntry;
+  | ProviderManagedOAuthCatalogEntry
+  | NoAuthCatalogEntry;
 
 /**
  * Catalog of MCP servers Novu surfaces in the picker. Every entry carries an
@@ -143,6 +155,11 @@ export type McpOAuthCatalogEntry =
  *   server-side by the provider. Gated behind
  *   `IS_MCP_PROVIDER_MANAGED_ENABLED` so the catalog migration can ship
  *   ahead of the per-org rollout.
+ *
+ * - `none` entries — keyless MCPs (e.g. Parallel Search) that accept
+ *   anonymous connections. No authorize URL is ever built and no connection
+ *   rows are persisted; enabling the entry projects the server onto the
+ *   managed runtime as-is.
  */
 export type McpServer = {
   /** Stable identifier used as a key in selections */
@@ -157,7 +174,8 @@ export type McpServer = {
   /**
    * OAuth wiring. Every catalog entry declares a mode — `provider-managed`
    * is the catch-all for MCPs whose connector OAuth lives inside the managed
-   * agent runtime provider's vault UI.
+   * agent runtime provider's vault UI, and `none` marks keyless MCPs that
+   * need no authentication at all.
    *
    * Typed as optional only so external `@novu/shared` consumers that pin
    * older minor versions keep type-checking; in this repo every entry sets
@@ -1877,6 +1895,15 @@ export const MCP_SERVERS: McpServer[] = [
     oauth: { mode: McpConnectionAuthModeEnum.ProviderManaged },
   },
   {
+    id: 'parallel-search',
+    name: 'Parallel Search',
+    description: 'Search the web and fetch page content with Parallel. Free to use, no account or API key required.',
+    url: 'https://search.parallel.ai/mcp',
+    category: 'data',
+    popular: false,
+    oauth: { mode: McpConnectionAuthModeEnum.None },
+  },
+  {
     id: 'paypal',
     name: 'PayPal',
     description: 'Connect PayPal to your agent via the managed runtime provider.',
@@ -2648,6 +2675,18 @@ export function isProviderManagedMcp(mcpId: string): boolean {
   }
 
   return !entry.oauth || entry.oauth.mode === McpConnectionAuthModeEnum.ProviderManaged;
+}
+
+/**
+ * True when the catalog entry is a keyless MCP (`none` mode) that needs no
+ * authentication. Such servers never produce connection rows: enablement
+ * alone projects them onto the managed runtime, and the OAuth endpoints
+ * reject them.
+ */
+export function isNoAuthMcp(mcpId: string): boolean {
+  const entry = MCP_SERVERS.find((server) => server.id === mcpId);
+
+  return entry?.oauth?.mode === McpConnectionAuthModeEnum.None;
 }
 
 /**

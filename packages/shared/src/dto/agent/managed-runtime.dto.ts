@@ -96,12 +96,17 @@ export enum McpConnectionScopeEnum {
  *                        ensures the provider vault exists and redirects the
  *                        user into the provider's vault UI so they can
  *                        complete connector auth there.
+ * - `none`             — Keyless MCPs that need no authentication at all
+ *                        (e.g. Parallel Search). Novu never builds an
+ *                        authorize URL, never creates connection rows, and
+ *                        projects the server onto the managed runtime as-is.
  */
 export enum McpConnectionAuthModeEnum {
   Dcr = 'dcr',
   NovuApp = 'novu-app',
   UserApp = 'user-app',
   ProviderManaged = 'provider-managed',
+  None = 'none',
 }
 
 /**

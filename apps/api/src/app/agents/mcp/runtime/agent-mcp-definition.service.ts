@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { PinoLogger, resolveAgentRuntime } from '@novu/application-generic';
 import { AgentMcpServerEntity, AgentMcpServerRepository, AgentRepository, IntegrationRepository } from '@novu/dal';
-import { MCP_SERVERS, McpConnectionScopeEnum } from '@novu/shared';
+import { MCP_SERVERS, McpConnectionAuthModeEnum, McpConnectionScopeEnum } from '@novu/shared';
 
 export type CatalogProjection = { externalId: string; name: string; url: string };
 
@@ -21,13 +21,16 @@ type ProjectableMcpRow = Pick<AgentMcpServerEntity, 'mcpId' | 'defaultScope'>;
 /**
  * Whether an enabled MCP belongs on Anthropic's **shared agent** (`agent.mcp_servers`).
  *
- * OAuth MCPs where each subscriber connects their own account (e.g. Linear) do not —
- * those are added per conversation after connect, on each `provider.send`.
+ * Keyless MCPs (e.g. Parallel Search) always do — there is no per-subscriber
+ * credential to attach, so the server is identical for every subscriber.
+ * OAuth MCPs where each subscriber connects their own account (e.g. Linear)
+ * do not — those are added per conversation after connect, on each
+ * `provider.send`.
  */
 function belongsOnAgentDefinition(row: Pick<AgentMcpServerEntity, 'mcpId' | 'defaultScope'>): boolean {
   const catalog = MCP_SERVERS.find((entry) => entry.id === row.mcpId);
 
-  if (!catalog?.oauth) {
+  if (!catalog?.oauth || catalog.oauth.mode === McpConnectionAuthModeEnum.None) {
     return !!catalog;
   }
 

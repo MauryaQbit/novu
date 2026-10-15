@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { McpConnectionAuthModeEnum } from '../../dto/agent/managed-runtime.dto';
 import {
   filterDemoConfigurableMcpIds,
+  isNoAuthMcp,
   isProviderManagedMcp,
   MCP_SERVERS,
   type McpOAuthCatalogEntry,
@@ -196,6 +197,8 @@ describe('MCP_SERVERS catalog', () => {
             return entry.issuer;
           case McpConnectionAuthModeEnum.ProviderManaged:
             return entry.mode;
+          case McpConnectionAuthModeEnum.None:
+            return entry.mode;
           default: {
             const _exhaustive: never = entry;
 
@@ -206,6 +209,37 @@ describe('MCP_SERVERS catalog', () => {
 
       expect(assertExhaustive({ mode: McpConnectionAuthModeEnum.Dcr })).toBe('web');
       expect(assertExhaustive({ mode: McpConnectionAuthModeEnum.ProviderManaged })).toBe('provider-managed');
+      expect(assertExhaustive({ mode: McpConnectionAuthModeEnum.None })).toBe('none');
+    });
+  });
+
+  describe('no-auth Parallel Search MCP', () => {
+    it('registers Parallel Search as a keyless catalog entry', () => {
+      const parallel = MCP_SERVERS.find((entry) => entry.id === 'parallel-search');
+
+      expect(parallel).toBeDefined();
+      expect(parallel?.url).toBe('https://search.parallel.ai/mcp');
+      expect(parallel?.oauth).toEqual({ mode: McpConnectionAuthModeEnum.None });
+      expect(isNoAuthMcp('parallel-search')).toBe(true);
+    });
+
+    it('does not label other modes as no-auth', () => {
+      expect(isNoAuthMcp('sentry')).toBe(false);
+      expect(isNoAuthMcp('slack')).toBe(false);
+      expect(isNoAuthMcp('github')).toBe(false);
+      expect(isNoAuthMcp('not-a-real-mcp')).toBe(false);
+    });
+
+    it('keeps the keyless entry configurable on demo agents', () => {
+      expect(filterDemoConfigurableMcpIds(['parallel-search', 'slack'])).toEqual(['parallel-search']);
+    });
+
+    it('selects the keyless entry for projection without a connection row', () => {
+      const selectable = MCP_SERVERS.filter((entry) => entry.oauth?.mode === McpConnectionAuthModeEnum.None).map(
+        (entry) => entry.id
+      );
+
+      expect(selectable).toContain('parallel-search');
     });
   });
 });

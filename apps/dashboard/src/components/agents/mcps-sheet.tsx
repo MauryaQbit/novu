@@ -61,16 +61,24 @@ type McpsSheetProps = {
  * `provider-managed` is intentionally NOT in this set — those entries go
  * through a dedicated per-row "Add from Claude" action that talks to a
  * different backend endpoint, so they must never end up in the staged save.
+ *
+ * `none` (keyless MCPs such as Parallel Search) IS in this set: enabling
+ * needs no authorization step, so Add stages the row and Save enables it
+ * directly.
  */
 const STAGED_AUTH_MODES = new Set<McpConnectionAuthModeEnum>([
   McpConnectionAuthModeEnum.Dcr,
   McpConnectionAuthModeEnum.NovuApp,
+  McpConnectionAuthModeEnum.None,
 ]);
 
 /**
  * Visual + interaction kind for a catalog row in the picker.
  *
  * - `oauth`             → Novu OAuth (dcr / novu-app). Staged Add + bulk Save.
+ * - `no-auth`           → Keyless MCP (no auth mode). Staged Add + bulk Save,
+ *                         exactly like `oauth` rows but rendered without any
+ *                         auth CTA — there is nothing to authorize.
  * - `provider-managed`  → "Add from Claude". Immediate per-row API call that
  *                         opens the provider vault UI in a new tab; bypasses
  *                         the staged Save flow entirely.
@@ -81,7 +89,7 @@ const STAGED_AUTH_MODES = new Set<McpConnectionAuthModeEnum>([
  *                         the row falls back to the "Coming soon" UX instead
  *                         of clicking through to a server-side 403.
  */
-type McpBadgeKind = 'oauth' | 'provider-managed' | 'unsupported';
+type McpBadgeKind = 'oauth' | 'no-auth' | 'provider-managed' | 'unsupported';
 
 type McpBadgeKindOptions = {
   /**
@@ -102,6 +110,10 @@ function getMcpBadgeKind(entry: McpServer, options: McpBadgeKindOptions): McpBad
     return options.providerManagedEnabled ? 'provider-managed' : 'unsupported';
   }
 
+  if (entry.oauth.mode === McpConnectionAuthModeEnum.None) {
+    return 'no-auth';
+  }
+
   if (STAGED_AUTH_MODES.has(entry.oauth.mode)) {
     return 'oauth';
   }
@@ -110,13 +122,17 @@ function getMcpBadgeKind(entry: McpServer, options: McpBadgeKindOptions): McpBad
 }
 
 function isMcpStagedSavable(entry: McpServer, options: McpBadgeKindOptions): boolean {
-  return getMcpBadgeKind(entry, options) === 'oauth';
+  const kind = getMcpBadgeKind(entry, options);
+
+  return kind === 'oauth' || kind === 'no-auth';
 }
 
 function getBadgeLabel(kind: McpBadgeKind): string {
   switch (kind) {
     case 'oauth':
       return 'OAuth';
+    case 'no-auth':
+      return 'No auth';
     case 'provider-managed':
       return 'Add from Claude';
     case 'unsupported':
@@ -132,8 +148,8 @@ function getBadgeLabel(kind: McpBadgeKind): string {
 /**
  * Sort actionable entries first, preserving the catalog's intrinsic ordering
  * (popular-first) within each group so the rows users can actually act on
- * surface at the top of every search result. OAuth + provider-managed both
- * count as actionable; only `unsupported` rows sink.
+ * surface at the top of every search result. OAuth, no-auth, and
+ * provider-managed all count as actionable; only `unsupported` rows sink.
  */
 function sortSupportedFirst(entries: McpServer[], options: McpBadgeKindOptions): McpServer[] {
   const actionable: McpServer[] = [];
@@ -235,8 +251,9 @@ export function McpsSheet({ agent, isOpen, onOpenChange, enabledServers, console
   }, [stagedIds, initialEnabledIds]);
 
   // Drop provider-managed entries from the picker for demo agents so the
-  // catalog only advertises the Novu-handled OAuth modes (dcr / novu-app) the
-  // user can actually wire up, matching the onboarding + provision filters.
+  // catalog only advertises the modes the user can actually wire up without a
+  // provider vault (Novu-handled OAuth dcr / novu-app, plus keyless no-auth),
+  // matching the onboarding + provision filters.
   const catalogMcps = useMemo(
     () => (isDemoProviderAgent ? MCP_SERVERS.filter((entry) => !isProviderManagedMcp(entry.id)) : MCP_SERVERS),
     [isDemoProviderAgent]
@@ -618,7 +635,7 @@ function McpRow({
   onRemove,
 }: McpRowProps) {
   const badgeKind = getMcpBadgeKind(entry, badgeKindOptions);
-  const isStagedSavable = badgeKind === 'oauth';
+  const isStagedSavable = badgeKind === 'oauth' || badgeKind === 'no-auth';
   const isProviderManaged = badgeKind === 'provider-managed';
   const isActionable = isStagedSavable || isProviderManaged;
   const isRowPending = isProviderManaged && pendingProviderManagedId === entry.id;

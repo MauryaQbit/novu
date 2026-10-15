@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { type IAgentRuntimeProvider, PinoLogger } from '@novu/application-generic';
 import { AgentMcpServerEntity, AgentMcpServerRepository, McpConnectionRepository } from '@novu/dal';
-import { MCP_SERVERS, McpConnectionScopeEnum, McpConnectionStatusEnum } from '@novu/shared';
+import { MCP_SERVERS, McpConnectionAuthModeEnum, McpConnectionScopeEnum, McpConnectionStatusEnum } from '@novu/shared';
 
 @Injectable()
 export class AgentMcpSessionService {
@@ -73,7 +73,9 @@ export class AgentMcpSessionService {
     }
 
     const oauthEnablements = enablements.filter((row) =>
-      MCP_SERVERS.some((entry) => entry.id === row.mcpId && entry.oauth)
+      MCP_SERVERS.some(
+        (entry) => entry.id === row.mcpId && entry.oauth && entry.oauth.mode !== McpConnectionAuthModeEnum.None
+      )
     );
 
     if (oauthEnablements.length === 0) {
@@ -106,7 +108,7 @@ export class AgentMcpSessionService {
         continue;
       }
 
-      const isOAuth = !!catalog.oauth;
+      const isOAuth = !!catalog.oauth && catalog.oauth.mode !== McpConnectionAuthModeEnum.None;
 
       if (isOAuth && !connectedMcpIds.has(enablement.mcpId)) {
         continue;

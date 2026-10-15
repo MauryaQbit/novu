@@ -484,6 +484,11 @@ export class GenerateMcpOAuthUrl {
         throw new BadRequestException(
           `MCP "${command.mcpId}" is provider-managed; use the provider-vault endpoint instead of Novu OAuth.`
         );
+      case McpConnectionAuthModeEnum.None:
+        // Keyless MCPs (e.g. Parallel Search) accept anonymous connections —
+        // there is no authorize URL to build. Enablement alone projects them
+        // onto the managed runtime.
+        throw new BadRequestException(`MCP "${command.mcpId}" does not use OAuth and needs no authorization.`);
       default: {
         const _exhaustive: never = entry;
 

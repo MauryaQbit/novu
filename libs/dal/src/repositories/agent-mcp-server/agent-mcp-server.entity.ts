@@ -24,8 +24,11 @@ export type AgentMcpServerScope = 'environment' | 'agent' | 'subscriber';
  *  - `provider-managed` — OAuth lives entirely inside the managed agent runtime
  *                         provider (e.g. Claude); Novu only ensures the vault
  *                         exists and redirects to the provider's vault UI.
+ *  - `none`             — Keyless MCPs (e.g. Parallel Search); no
+ *                         authentication is performed and no connection rows
+ *                         are created.
  */
-export type AgentMcpServerAuthMode = 'dcr' | 'novu-app' | 'user-app' | 'provider-managed';
+export type AgentMcpServerAuthMode = 'dcr' | 'novu-app' | 'user-app' | 'provider-managed' | 'none';
 
 export type AgentMcpServerStatus = 'active' | 'syncing' | 'error' | 'disabled';
 

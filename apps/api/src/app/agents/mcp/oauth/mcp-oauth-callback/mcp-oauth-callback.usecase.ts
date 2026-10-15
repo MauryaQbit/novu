@@ -205,6 +205,11 @@ export class McpOAuthCallback {
         // catalog mode flip mid-flight; reject explicitly so the row stays
         // intact for the provider-vault flow.
         throw new BadRequestException(`MCP "${mcpId}" is provider-managed and does not use the Novu OAuth callback.`);
+      case McpConnectionAuthModeEnum.None:
+        // Keyless MCPs never produce a Novu OAuth callback because Novu
+        // never builds an authorize URL for them. Reaching this branch
+        // implies a crafted callback; reject explicitly.
+        throw new BadRequestException(`MCP "${mcpId}" does not use OAuth and does not use the Novu OAuth callback.`);
       default: {
         const _exhaustive: never = oauthConfig;
 
@@ -397,7 +402,11 @@ export class McpOAuthCallback {
     plainAuth: ReturnType<typeof this.buildPlainAuth>,
     oauthClient: McpConnectionOAuthClient
   ): Promise<McpOAuthCallbackResult> {
-    const catalog = MCP_SERVERS.find((entry) => entry.id === stateData.mcpId)!;
+    const catalog = MCP_SERVERS.find((entry) => entry.id === stateData.mcpId);
+
+    if (!catalog) {
+      throw new BadRequestException(`Unknown MCP "${stateData.mcpId}".`);
+    }
 
     try {
       await this.runPostConnectActions({
@@ -556,6 +565,14 @@ export class McpOAuthCallback {
   }
 
   private async resumeSessionAfterConnect(stateData: McpOAuthState, connection: McpConnectionEntity): Promise<void> {
+    const { conversationId, toolUseId, platformThreadId } = stateData;
+
+    // The caller only resumes when conversation context is present; bail out
+    // defensively so the non-null assertion ban stays satisfied.
+    if (!conversationId || !toolUseId || !platformThreadId) {
+      return;
+    }
+
     const subscriber = await this.subscriberRepository.findOne(
       { _id: stateData.subscriberId, _environmentId: stateData.environmentId },
       'subscriberId'
@@ -598,17 +615,17 @@ export class McpOAuthCallback {
     this.showTypingIndicator(stateData);
 
     await this.managedAgentService.sendToolResult({
-      conversationId: stateData.conversationId!,
+      conversationId,
       environmentId: stateData.environmentId,
       organizationId: stateData.organizationId,
       agentIdentifier: stateData.agentIdentifier ?? '',
       integrationIdentifier: stateData.integrationIdentifier ?? '',
       subscriberId: subscriber.subscriberId,
-      toolUseId: stateData.toolUseId!,
+      toolUseId,
       content: 'OK',
       followUpMessage: `${stateData.mcpId ?? 'Integration'} is now connected and ready. Resume the user's original request. Use the available tools directly. Do not output any preamble or mention the connection — go straight to action.`,
       platform: stateData.platform as AgentPlatformEnum,
-      platformThreadId: stateData.platformThreadId!,
+      platformThreadId,
       suppressReply: true,
     });
   }
